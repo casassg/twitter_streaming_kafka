@@ -4,7 +4,7 @@ from tweepy import OAuthHandler
 from tweepy import Stream
 import os
 import json
-import threading, logging, time
+import logging, time
 from kafka import KafkaProducer
 
 # Variables that contains the user credentials to access Twitter API
@@ -16,31 +16,30 @@ consumer_secret = os.environ.get("CONSUMER_SECRET", "ENTER YOUR API SECRET")
 tokens = os.environ.get("TOKENS", "")
 
 tokens = tokens.replace(" ", "").split(",")
-kafka_server = os.environ.get('KAFKA_SERVER', 'localhost:9092')
-kafka_servers = kafka_server.split(',')
+kafka_server = os.environ.get('KAFKA_SERVERS', 'localhost:9092').split(',')
 producer = KafkaProducer(
-            bootstrap_servers=kafka_server,
-            value_serializer=lambda v: json.dumps(v).encode('utf-8')
-        )
+    bootstrap_servers=kafka_server,
+    retries=5,
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
 
 # This is a basic listener that just prints received tweets to stdout.
 class KafkaListener(StreamListener):
-
     def on_data(self, data):
         producer.send('raw_tweets', data)
-        logging.info("Tweet received")
+        # logging.info("Tweet transmitted")
         return True
 
     def on_error(self, status):
-        logging.info('Tweet error, status: %s' % status)
+        logging.error('Tweet error, status: %s' % status)
 
 
 def main():
     auth = OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
     stream = Stream(auth, KafkaListener())
-
-    # This line filter Twitter Streams to capture data by the keywords: 'python', 'javascript', 'ruby'
+    logging.info('Twitter stream opened')
     stream.filter(track=tokens)
     time.sleep(10)
 
@@ -50,4 +49,7 @@ if __name__ == "__main__":
         format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s',
         level=logging.INFO
     )
+    logging.info('Tracking keywords: %s' % ','.join(tokens))
+    logging.info('Kafka servers: %s' % ','.join(kafka_server))
+    logging.info('Start stream track')
     main()
