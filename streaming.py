@@ -17,6 +17,7 @@ tokens = os.environ.get("TOKENS", "")
 
 tokens = tokens.replace(" ", "").split(",")
 kafka_server = os.environ.get('KAFKA_SERVER', 'localhost:9092')
+kafka_servers = kafka_server.split(',')
 producer = KafkaProducer(
             bootstrap_servers=kafka_server,
             value_serializer=lambda v: json.dumps(v).encode('utf-8')
