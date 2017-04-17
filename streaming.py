@@ -31,8 +31,9 @@ class KafkaListener(StreamListener):
         try:
             producer.send('raw_tweets', data)
         except:
-            client = producer._sender._client
+            client = SimpleClient(hosts=kafka_server)
             client.ensure_topic_exists('raw_tweets')
+            client.close()
             producer.send('raw_tweets', data)
 
         # logging.info("Tweet transmitted")
@@ -61,4 +62,5 @@ if __name__ == "__main__":
     logging.info('Start stream track')
     client = SimpleClient(hosts=kafka_server)
     client.ensure_topic_exists('raw_tweets')
+    client.close()
     main()
