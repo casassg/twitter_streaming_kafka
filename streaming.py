@@ -5,7 +5,7 @@ from tweepy import Stream
 import os
 import json
 import logging, time
-from kafka import KafkaProducer
+from kafka import KafkaProducer, KafkaClient, SimpleClient
 
 # Variables that contains the user credentials to access Twitter API
 access_token = os.environ.get("ACCESS_TOKEN", "ENTER YOUR ACCESS TOKEN")
@@ -27,7 +27,14 @@ producer = KafkaProducer(
 # This is a basic listener that just prints received tweets to stdout.
 class KafkaListener(StreamListener):
     def on_data(self, data):
-        producer.send('raw_tweets', data)
+
+        try:
+            producer.send('raw_tweets', data)
+        except:
+            client = producer._sender._client
+            client.ensure_topic_exists('raw_tweets')
+            producer.send('raw_tweets', data)
+
         # logging.info("Tweet transmitted")
         return True
 
@@ -52,4 +59,6 @@ if __name__ == "__main__":
     logging.info('Tracking keywords: %s' % ','.join(tokens))
     logging.info('Kafka servers: %s' % ','.join(kafka_server))
     logging.info('Start stream track')
+    client = SimpleClient(hosts=kafka_server)
+    client.ensure_topic_exists('raw_tweets')
     main()
