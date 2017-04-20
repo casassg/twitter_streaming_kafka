@@ -1,27 +1,35 @@
 # import the necessary methods from tweepy library
-from tweepy.streaming import StreamListener
+import json
+import logging
+import os
+import time
+
+from kafka import KafkaProducer, SimpleClient
 from tweepy import OAuthHandler
 from tweepy import Stream
-import os
-import json
-import logging, time
-from kafka import KafkaProducer, KafkaClient, SimpleClient
+from tweepy.streaming import StreamListener
 
 # Variables that contains the user credentials to access Twitter API
-access_token = os.environ.get("ACCESS_TOKEN", "ENTER YOUR ACCESS TOKEN")
-access_token_secret = os.environ.get("ACCESS_TOKEN_SECRET", "ENTER YOUR ACCESS TOKEN SECRET")
-consumer_key = os.environ.get("CONSUMER_KEY", "ENTER YOUR API KEY")
-consumer_secret = os.environ.get("CONSUMER_SECRET", "ENTER YOUR API SECRET")
+KAFKA_TOPIC = os.environ.get('KAFKA_TOPIC', 'raw_tweets')
+ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN", "ENTER YOUR ACCESS TOKEN")
+ACCESS_TOKEN_SECRET = os.environ.get("ACCESS_TOKEN_SECRET", "ENTER YOUR ACCESS TOKEN SECRET")
+CONSUMER_KEY = os.environ.get("CONSUMER_KEY", "ENTER YOUR API KEY")
+CONSUMER_SECRET = os.environ.get("CONSUMER_SECRET", "ENTER YOUR API SECRET")
 
-tokens = os.environ.get("TOKENS", "")
+TOKENS = os.environ.get("TOKENS", "").split(",")
 
-tokens = tokens.replace(" ", "").split(",")
-kafka_server = os.environ.get('KAFKA_SERVERS', 'localhost:9092').split(',')
+KAFKA_SERVERS = os.environ.get('KAFKA_SERVERS', 'localhost:9092').split(',')
 producer = KafkaProducer(
-    bootstrap_servers=kafka_server,
+    bootstrap_servers=KAFKA_SERVERS,
     retries=5,
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
+
+
+def ensure_topic():
+    client = SimpleClient(hosts=KAFKA_SERVERS)
+    client.ensure_topic_exists(KAFKA_TOPIC)
+    client.close()
 
 
 # This is a basic listener that just prints received tweets to stdout.
@@ -29,11 +37,10 @@ class KafkaListener(StreamListener):
     def on_data(self, data):
 
         try:
-            producer.send('raw_tweets', data)
+            producer.send(KAFKA_TOPIC, data)
         except:
-            with SimpleClient(hosts=kafka_server) as client:
-                client.ensure_topic_exists('raw_tweets')
-            producer.send('raw_tweets', data)
+            ensure_topic()
+            producer.send(KAFKA_TOPIC, data)
 
         # logging.info("Tweet transmitted")
         return True
@@ -43,11 +50,11 @@ class KafkaListener(StreamListener):
 
 
 def main():
-    auth = OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_token_secret)
+    auth = OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
     stream = Stream(auth, KafkaListener())
     logging.info('Twitter stream opened')
-    stream.filter(track=tokens)
+    stream.filter(track=TOKENS)
     time.sleep(10)
 
 
@@ -56,9 +63,8 @@ if __name__ == "__main__":
         format='%(asctime)s.%(msecs)s:%(name)s:%(thread)d:%(levelname)s:%(process)d:%(message)s',
         level=logging.INFO
     )
-    logging.info('Tracking keywords: %s' % ','.join(tokens))
-    logging.info('Kafka servers: %s' % ','.join(kafka_server))
+    logging.info('Tracking keywords: %s' % ','.join(TOKENS))
+    logging.info('Kafka servers: %s' % ','.join(KAFKA_SERVERS))
     logging.info('Start stream track')
-    with SimpleClient(hosts=kafka_server) as client:
-        client.ensure_topic_exists('raw_tweets')
+    ensure_topic()
     main()
