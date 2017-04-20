@@ -4,3 +4,5 @@ app.sh
 
 kubernetes/
 .idea/
+
+.DS_Store
