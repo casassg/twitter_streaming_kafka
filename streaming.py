@@ -38,6 +38,7 @@ class KafkaListener(StreamListener):
 
         try:
             producer.send(KAFKA_TOPIC, data)
+            logging.info('Tweet sent successfully!')
         except:
             ensure_topic()
             producer.send(KAFKA_TOPIC, data)
