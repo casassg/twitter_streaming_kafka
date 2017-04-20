@@ -33,7 +33,7 @@ def ensure_topic():
 
 
 # This is a basic listener that just prints received tweets to stdout.
-class KafkaListener(StreamListener):
+class TwitterListener(StreamListener):
     def on_data(self, data):
 
         try:
@@ -42,8 +42,8 @@ class KafkaListener(StreamListener):
         except:
             ensure_topic()
             producer.send(KAFKA_TOPIC, data)
+            logging.info('Tweet sent successfully!')
 
-        # logging.info("Tweet transmitted")
         return True
 
     def on_error(self, status):
@@ -53,7 +53,7 @@ class KafkaListener(StreamListener):
 def main():
     auth = OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-    stream = Stream(auth, KafkaListener())
+    stream = Stream(auth, TwitterListener())
     logging.info('Twitter stream opened')
     stream.filter(track=TOKENS)
     time.sleep(10)
